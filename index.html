@@ -16,7 +16,11 @@
   :root { --blau:#082C50; --blau2:#1d4a78; --hell:#eef3f8; --text:#1F2933; --grau:#5F6B76; --ok:#e6f4ea; --okrand:#7cb48a; --warn:#fff4e0; }
   * { box-sizing:border-box; }
   body { margin:0; font-family:-apple-system, "Segoe UI", Arial, sans-serif; font-size:17px; color:var(--text); background:#f5f7fa; }
-  header { background:var(--blau); color:#fff; padding:18px 20px; }
+  header { background:var(--blau); color:#fff; padding:18px 20px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; }
+  #aktualisieren { background:#fff; color:var(--blau); font-size:15px; padding:9px 14px; }
+  #version { font-size:12px; opacity:.7; margin-top:4px; text-align:right; }
+  #updateHinweis { display:none; background:var(--warn); padding:12px 16px; border-radius:10px; margin-bottom:16px; font-size:16px; }
+  #updateHinweis.an { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; }
   header h1 { margin:0; font-size:24px; }
   header p { margin:4px 0 0; opacity:.8; font-size:14px; }
   main { max-width:860px; margin:0 auto; padding:16px; }
@@ -59,10 +63,14 @@
 </head>
 <body>
 <header>
-  <h1>Schülerakte anlegen</h1>
-  <p>Klinikschule Dothanschule · läuft vollständig auf diesem Gerät, es werden keine Daten verschickt</p>
+  <div>
+    <h1>Schülerakte anlegen</h1>
+    <p>Klinikschule Dothanschule · läuft vollständig auf diesem Gerät, es werden keine Daten verschickt</p>
+  </div>
+  <div><button id="aktualisieren" type="button">⟳ Aktualisieren</button><div id="version"></div></div>
 </header>
 <main>
+<div id="updateHinweis"><span><b>Neue Version verfügbar.</b> Bitte erst die aktuelle Akte fertig erstellen, dann aktualisieren (Eingaben gehen dabei verloren).</span><button id="updateJetzt" type="button">Jetzt aktualisieren</button></div>
 <div id="keinJS"><b>Die Seite läuft in dieser Ansicht nicht.</b> Hier werden keine Skripte ausgeführt, typisch für die Vorschau in der Dateien-App, in Mail oder im Claude-Fenster. Bitte die Datei in Safari (iPad) bzw. Edge/Chrome (Windows) öffnen.</div>
 
 <section>
@@ -518,6 +526,45 @@ function artUmschalten(){
   document.getElementById('ergebnis').className = 'meldung';
 }
 document.querySelectorAll('input[name="art"]').forEach(i => i.addEventListener('change', artUmschalten));
+// ---------- Aktualisierung ----------
+// Bei jeder Änderung an der Seite VERSION hier UND in version.json gleich hochzählen.
+const VERSION = '2026-10-12-2';
+document.getElementById('version').textContent = 'Version ' + VERSION;
+function eingabenVorhanden(){
+  return ['vorname','nachname','stammschule','klasse','fb_lehrkraft'].some(id => wert(id));
+}
+async function aktualisieren(){
+  try {
+    if ('caches' in window) for (const k of await caches.keys()) await caches.delete(k);
+    if (navigator.serviceWorker) for (const r of await navigator.serviceWorker.getRegistrations()) await r.update();
+  } catch (e) {}
+  location.replace(location.pathname + '?v=' + Date.now());
+}
+async function pruefeUpdate(manuell){
+  try {
+    const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+    const neu = (await r.json()).version;
+    if (neu && neu !== VERSION) {
+      if (manuell || !eingabenVorhanden()) return aktualisieren();   // nichts eingegeben: sofort neu laden
+      document.getElementById('updateHinweis').classList.add('an');
+    } else if (manuell) {
+      const v = document.getElementById('version'); v.textContent = 'Version ' + VERSION + ' · aktuell ✓';
+    }
+  } catch (e) {
+    if (manuell) document.getElementById('version').textContent = 'Version ' + VERSION + ' · offline, keine Prüfung möglich';
+  }
+}
+document.getElementById('aktualisieren').addEventListener('click', () => {
+  if (eingabenVorhanden() && !confirm('Beim Aktualisieren gehen die bisherigen Eingaben verloren. Trotzdem aktualisieren?')) return;
+  pruefeUpdate(true);
+});
+document.getElementById('updateJetzt').addEventListener('click', () => {
+  if (eingabenVorhanden() && !confirm('Beim Aktualisieren gehen die bisherigen Eingaben verloren. Trotzdem aktualisieren?')) return;
+  aktualisieren();
+});
+pruefeUpdate(false);                                                   // beim Öffnen
+document.addEventListener('visibilitychange', () => { if (!document.hidden) pruefeUpdate(false); });   // beim Zurückwechseln in die App
+setInterval(() => pruefeUpdate(false), 30 * 60 * 1000);                // und alle 30 Minuten
 const erg = document.getElementById('ergebnis');
 window.addEventListener('error', e => { erg.className = 'meldung an warn'; erg.textContent = 'Fehler: ' + (e.message || e); });
 window.addEventListener('unhandledrejection', e => { erg.className = 'meldung an warn'; erg.textContent = 'Fehler: ' + (e.reason && e.reason.message || e.reason); });
