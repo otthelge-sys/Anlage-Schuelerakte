@@ -180,6 +180,19 @@
   <div id="ergebnis" class="meldung"></div>
 </section>
 
+<section>
+  <h2>6. Leere Vorlagen</h2>
+  <p class="hinweis" style="margin-top:0">Leere Vorlagen ohne Daten, z. B. für zusätzliche Bögen in GoodNotes. Stand: 23.11.2026.</p>
+  <label class="f">Variante</label>
+  <div class="opts" id="vVariante"><label><input type="radio" name="vVariante" value="mit_Linien"> mit Linien</label><label><input type="radio" name="vVariante" value="ohne_Linien" checked> ohne Linien</label></div>
+  <table class="termine" id="vorlagenListe" style="margin-top:10px">
+    <tr><td><b>Schülerakte komplett</b><br><span class="hinweis">34 Seiten, ohne Namen und Termine</span></td><td style="text-align:right;white-space:nowrap"><button class="zweit vTeilen" data-datei="Schuelerakte_komplett" type="button">Teilen</button> <button class="zweit vLaden" data-datei="Schuelerakte_komplett" type="button">Laden</button></td></tr>
+    <tr><td><b>Erstgespräch-Bogen</b><br><span class="hinweis">9 Seiten</span></td><td style="text-align:right;white-space:nowrap"><button class="zweit vTeilen" data-datei="Vorlage_Erstgespraech" type="button">Teilen</button> <button class="zweit vLaden" data-datei="Vorlage_Erstgespraech" type="button">Laden</button></td></tr>
+    <tr><td><b>Schulbesprechung</b><br><span class="hinweis">1 Seite, mit Datumsfeld</span></td><td style="text-align:right;white-space:nowrap"><button class="zweit vTeilen" data-datei="Vorlage_Schulbesprechung" type="button">Teilen</button> <button class="zweit vLaden" data-datei="Vorlage_Schulbesprechung" type="button">Laden</button></td></tr>
+  </table>
+  <div id="vorlagenMeldung" class="meldung"></div>
+</section>
+
 </main>
 
 <script>!function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"function"==typeof define&&define.amd?define(["exports"],e):e((t=t||self).PDFLib={})}(this,(function(t){"use strict";
@@ -528,7 +541,7 @@ function artUmschalten(){
 document.querySelectorAll('input[name="art"]').forEach(i => i.addEventListener('change', artUmschalten));
 // ---------- Aktualisierung ----------
 // Bei jeder Änderung an der Seite VERSION hier UND in version.json gleich hochzählen.
-const VERSION = '2026-10-12-2';
+const VERSION = '2026-11-23-1';
 document.getElementById('version').textContent = 'Version ' + VERSION;
 function eingabenVorhanden(){
   return ['vorname','nachname','stammschule','klasse','fb_lehrkraft'].some(id => wert(id));
@@ -588,6 +601,39 @@ document.getElementById('laden').addEventListener('click', () => {
 document.getElementById('teilen').addEventListener('click', async () => {
   try { await navigator.share({ files: [fertig], title: fertig.name }); } catch (e) { if (e.name !== 'AbortError') { erg.className='meldung an warn'; erg.textContent = 'Teilen nicht möglich: ' + e.message; } }
 });
+// ---------- Leere Vorlagen (Abschnitt 6) ----------
+// Die PDFs liegen im Ordner vorlagen/ und werden vorab geladen, damit „Teilen“ auf dem iPad direkt beim Tippen funktioniert.
+const vorlagenDateien = {};
+const vMeld = document.getElementById('vorlagenMeldung');
+function vName(basis){ return basis + '_' + gewaehlt('vVariante')[0] + '.pdf'; }
+async function vorlageHolen(name){
+  if (vorlagenDateien[name]) return vorlagenDateien[name];
+  const r = await fetch('vorlagen/' + name);
+  if (!r.ok) throw new Error('Vorlage nicht gefunden (' + name + ')');
+  vorlagenDateien[name] = new File([await r.blob()], name, { type: 'application/pdf' });
+  return vorlagenDateien[name];
+}
+function vorlagenVorladen(){ document.querySelectorAll('.vTeilen').forEach(b => vorlageHolen(vName(b.dataset.datei)).catch(() => {})); }
+document.querySelectorAll('input[name="vVariante"]').forEach(i => i.addEventListener('change', vorlagenVorladen));
+document.querySelectorAll('.vTeilen').forEach(b => b.addEventListener('click', async () => {
+  const name = vName(b.dataset.datei);
+  try {
+    const bereit = vorlagenDateien[name];
+    const f = bereit || await vorlageHolen(name);
+    if (!(navigator.canShare && navigator.canShare({ files: [f] }))) { vMeld.className = 'meldung an warn'; vMeld.textContent = 'Teilen ist hier nicht möglich, bitte „Laden“ benutzen.'; return; }
+    if (!bereit) { vMeld.className = 'meldung an'; vMeld.textContent = name + ' ist geladen. Bitte noch einmal auf „Teilen“ tippen.'; return; }
+    await navigator.share({ files: [f], title: name });
+    vMeld.className = 'meldung';
+  } catch (e) { if (e.name !== 'AbortError') { vMeld.className = 'meldung an warn'; vMeld.textContent = 'Teilen nicht möglich: ' + e.message; } }
+}));
+document.querySelectorAll('.vLaden').forEach(b => b.addEventListener('click', async () => {
+  try {
+    const f = await vorlageHolen(vName(b.dataset.datei));
+    const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+  } catch (e) { vMeld.className = 'meldung an warn'; vMeld.textContent = e.message; }
+}));
+vorlagenVorladen();
 </script>
 </body>
 </html>

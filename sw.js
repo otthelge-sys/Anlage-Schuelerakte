@@ -1,7 +1,8 @@
 // Offline-Zwischenspeicher: Seite funktioniert nach dem ersten Aufruf auch ohne Internet.
 // Es werden nur die Programmdateien gespeichert, keine eingegebenen Daten.
-const CACHE = 'akte-v9';
-const DATEIEN = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
+const CACHE = 'akte-v10';
+const DATEIEN = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png',
+  './vorlagen/Schuelerakte_komplett_mit_Linien.pdf', './vorlagen/Schuelerakte_komplett_ohne_Linien.pdf', './vorlagen/Vorlage_Erstgespraech_mit_Linien.pdf', './vorlagen/Vorlage_Erstgespraech_ohne_Linien.pdf', './vorlagen/Vorlage_Schulbesprechung_mit_Linien.pdf', './vorlagen/Vorlage_Schulbesprechung_ohne_Linien.pdf'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(DATEIEN)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', e => {
